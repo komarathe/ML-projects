@@ -1,0 +1,129 @@
+---
+title: "Cancer Classification"
+author: "Komarathe"
+date: "12/28/2021"
+output: html_document
+---
+
+```{r load_packages}
+# Load required packages
+library(tidyverse)
+library(caret)
+library(class)
+library(gmodels)
+```
+
+**Data Resource:**
+
+- I gathered this data from [Kaggle](https://www.kaggle.com/ramadan16006/cancerclassification)
+- 31 columns contain information regrading tumors size, symmetry, radius, perimeter, malignant or benign, etc.
+
+```{r load_data}
+# Load data 
+tumor_data <- read.csv("cancer_classification.csv")
+head(tumor_data)
+```
+
+## Data Exploration
+
+```{r summary}
+# Summary statistics
+str(tumor_data)
+summary(tumor_data)
+```
+
+```{r}
+# Replace . in column names with _ 
+colnames(tumor_data) <- gsub("\\.", "_", colnames(tumor_data))
+```
+
+
+**FINDINGS:**
+
+- There are 569 observations and 31 variables
+- All variables are numeric
+- Our target variable is benign_0__mal_1, where value 1 represents malignant (cancer) and 0 represents benign
+- All variables are measurements in different units
+- There are no missing values in this data
+
+
+```{r boxplots}
+# Plot boxplots for all numeric variables
+for (i in 1:30) {
+  boxplot(tumor_data[,i], 
+          main = paste("Box plot for", colnames(tumor_data)[i]), 
+          ylab = colnames(tumor_data)[i])
+}
+```
+
+
+```{r distribution}
+# Plot distribution of all the independent variables
+for(i in 1:30) {
+  hist(tumor_data[,i], 
+       main = colnames(tumor_data)[i], 
+       xlab = colnames(tumor_data)[i], 
+       col = 'yellow')
+}
+
+# Get frequency of values in traget variable
+table(tumor_data$benign_0__mal_1)
+```
+
+### Scale the numeric variales for KNN Algorithm
+
+- Since all the values in the numeric variables are measured in different units their ranges vary.
+- For KNN algorithm we will scale these variables using min-max normalization.
+```{r}
+# Make a copy of original data
+knn_data <- tumor_data
+
+# Create a function for min-max normalization
+min_max <- function(x){
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+# Scale the data using min_max()
+knn_norm_data <- as.data.frame(lapply(knn_data[1:30], min_max))
+
+# Add benign_0__mal_1 column to knn_norm_data
+knn_norm_data$benign_0__mal_1 <- knn_data$benign_0__mal_1
+```
+
+
+### Data preparation for KNN Algorithm
+```{r}
+# Divide data into training and testing data sets
+knn_samples <- createDataPartition(knn_norm_data$benign_0__mal_1, p = 0.8, list = FALSE)
+knn_train <- knn_norm_data[knn_samples,]
+knn_test <- knn_norm_data[-knn_samples,]
+
+# Store target variable of training and testing data sets into different vectors
+knn_train_labels <- knn_train[, 31]
+knn_test_labels <- knn_test[, 31]
+```
+
+### Train model on train data
+For k, we will use square root of number of rows in train data which is 21
+```{r}
+# Use knn() from class package
+knn_pred <- knn(train = knn_train, 
+                test = knn_test, 
+                cl = knn_train_labels, 
+                k = 21)
+
+```
+
+### Evaluate KNN model
+```{r}
+# Get the confusion matrix of predicted and actual values
+CrossTable(x = knn_test_labels, y = knn_pred, prop.chisq=FALSE)
+```
+
+**FINDINGS:**
+
+- 49/113 were correctly identified as benign.
+- 64/113 were correctly identified as malignant
+- No false negatives and fals positives. The model correctly classified all 113 cases.
+
+
